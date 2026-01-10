@@ -64,22 +64,49 @@ sudo kubeadm init \
 --pod-network-cidr defines the IP range used for Pod-to-Pod communication,
 and must be aligned with the CNI configuration (Calico in this case). you can use 10.244.0.0/16
 
+### Note:
+
+With Calico, if CALICO_IPV4POOL_CIDR is not explicitly set in the manifest,
+Calico automatically creates a default IPPool using the value provided to kubeadm (--pod-network-cidr).
+After installation you can check
+
+```bash
+kubectl get ippools
+```
+you can see: **default-ipv4-ippool**
+
 ## 5. Set authorization for the principal user to the master node
 ```bash
 mkdir -p $HOME/.kube
 sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
 sudo chown $(id -u):$(id -g) $HOME/.kube/config
 ```
-## 6. Download caligo manifest
+
+## 6. Node IP selection (kubelet)
+In our environments (Vagrant/Virtualbox), nodes have both NAT and bridged interfaces.
+- a NAT interface (enp0s3: e.g 10.0.2.x)
+- a bridged interface (enp0s8: eg 192.168.x.x)
+
+Kubelet may select the NAT IP by default, causing networking issues.
+Always explicitly configure kubelet to use the bridged interface IP via --node-ip.
+This is achieved by configuring kubelet with the --node-ip flag.
+
+````bash
+#/etc/default/kubelet
+KUBELET_EXTRA_ARGS=--node-ip=x.x.x.x
+````
+x.x.x.x is the ip address for the interface bridge enp0s8
+ex: 192.168.1.22
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart kubelet
+```
+
+## 7. Download calico manifest
 ````bash
 #download manifest
 curl -O https://raw.githubusercontent.com/projectcalico/calico/v3.27.2/manifests/calico.yaml
 #install calico
 kubectl apply -f calico.yaml  
-````
-
-## 7. Check calico configs
-````bash
-kubectl get ippools.crd.projectcalico.org
-default-ipv4-ippool
 ````
