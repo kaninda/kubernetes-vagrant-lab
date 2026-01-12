@@ -68,8 +68,29 @@ sysctl net.ipv4.ip_forward
 ```
 ---
 
-## 4. Join the worker node to the cluster
-### 4.1. Generate the join command (on the control plane)
+## 4. Node IP selection (kubelet)
+In our environments (Vagrant/Virtualbox), nodes have both NAT and bridged interfaces.
+- a NAT interface (enp0s3: e.g 10.0.2.x)
+- a bridged interface (enp0s8: eg 192.168.x.x)
+
+Kubelet may select the NAT IP by default, causing networking issues.
+Always explicitly configure kubelet to use the bridged interface IP via --node-ip.
+This is achieved by configuring kubelet with the --node-ip flag.
+
+````bash
+#/etc/default/kubelet
+KUBELET_EXTRA_ARGS=--node-ip=x.x.x.x
+````
+x.x.x.x is the ip address for the interface bridge enp0s8
+ex: 192.168.1.22
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart kubelet
+```
+
+## 5. Join the worker node to the cluster
+### 5.1. Generate the join command (on the control plane)
 
 On the control plane node, generate a join command:
 
@@ -77,7 +98,7 @@ On the control plane node, generate a join command:
 kubeadm token create --print-join-command
 ```
 the command will generate a kubeadm command that help worker to join the cluster
-### 4.2. Join each node to the cluster
+### 5.2. Join each node to the cluster
 ```bash
 kubeadm join 1XXX \
   --token 2XXX \
