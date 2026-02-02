@@ -1,18 +1,23 @@
 # kubernetes-vagrant-lab - Install Worker node
-
+### Goals
+kubernetes version: 1.34.x
 ## 1. Prérequis système
 
-### 1.1. container runtime
-Install and configure a container runtime (containerd).
-
+### 1.1. Disable swap
+swap off → ✔️
+````bash
+sudo swapoff -a
+sudo sed -i '/ swap / s/^/#/' /etc/fstab
+````
+### 1.2. Container runtime
+containerd → ✔️
 ```bash
 sudo apt-get update
 sudo apt-get install containerd -y
 ```
 
-### 1.2. Align cgroup driver between kubelet and container runtime
-Ensure that both kubelet and containerd use the `systemd` cgroup driver.
-
+### 1.3. Align cgroup driver between kubelet and container runtime
+systemd cgroup → ✔️
 ```bash
 sudo mkdir -p /etc/containerd
 sudo containerd config default | sed 's/SystemdCgroup = false/SystemdCgroup = true/' | sudo tee /etc/containerd/config.toml
@@ -20,9 +25,8 @@ sudo systemctl restart containerd
 sudo systemctl enable containerd
 ```
 ---
-
 ## 2. Installation kubeadm, kubelet, kubectl
-
+### 2.1. Setting the last kubernetes version for 1.34.
 ```bash
 # apt-transport-https may be a dummy package; if so, you can skip that package
 sudo apt-get install -y apt-transport-https ca-certificates curl gpg
@@ -32,7 +36,19 @@ curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.34/deb/Release.key | sudo gpg --
 # This overwrites any existing configuration in /etc/apt/sources.list.d/kubernetes.list
 echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.34/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
 sudo apt-get update
-sudo apt-get install -y kubelet kubeadm kubectl
+```
+### 2.2 Getting last 1.34 version to install
+```bash
+apt-cache madison kubeadm
+```
+exemple de sortie:
+```bash
+kubeadm | 1.34.0-1.1 | https://pkgs.k8s.io/core:/stable:/v1.34/deb/
+```
+### 2.3 Install the exact retrieved kubelet, kubeadm et kubectl
+ex: 1.34.0-1.1
+```bash
+sudo apt-get install -y kubelet=1.34.0-1.1 kubeadm=1.34.0-1.1 kubectl=1.34.0-1.1
 sudo apt-mark hold kubelet kubeadm kubectl
 ```
 > Note: `kubectl` is optional on worker nodes but useful for debugging in lab environments.
@@ -42,17 +58,20 @@ Install Kubernetes components and prevent automatic upgrades.
 ---
 
 ## 3. Prepare network kernel
-
 ### 3.1. Enable bridge traffic by loading module br_netfilter
-
-Load the `br_netfilter` kernel module to allow iptables to see bridged traffic.
-
 ```bash
-echo 'br_netfilter' | sudo tee /etc/modules-load.d/k8s.conf
+sudo tee /etc/modules-load.d/k8s.conf <<EOF
+overlay
+br_netfilter
+EOF
 ```
+```bash
+sudo modprobe overlay
+sudo modprobe br_netfilter
+```
+
 ### 3.2. Adding some systctl for firewall and routing
 
-Enable IP forwarding and required bridge networking settings.
 ```bash
 cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
 net.bridge.bridge-nf-call-iptables = 1
@@ -64,6 +83,7 @@ EOF
 sudo sysctl --system
 ```
 ```bash
+lsmod | egrep 'overlay|br_netfilter'
 sysctl net.ipv4.ip_forward
 ```
 ---
